@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Cadre Photo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #000;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+
+        /* Container diaporama */
+        #slideshow {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #slideshow img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 1.5s ease-in-out;
+        }
+
+        #slideshow img.active {
+            opacity: 1;
+        }
+
+        /* Panneau de configuration */
+        #config-toggle {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: rgba(255,255,255,0.3);
+            border: none;
+            color: white;
+            font-size: 24px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        #config-panel {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 999;
+            padding: 30px;
+            overflow-y: auto;
+            color: white;
+        }
+
+        #config-panel.visible {
+            display: block;
+        }
+
+        #config-panel h2 {
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+
+        #config-panel label {
+            display: block;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            font-size: 16px;
+            color: #ccc;
+        }
+
+        #config-panel input[type="number"],
+        #config-panel input[type="time"] {
+            width: 100%;
+            padding: 12px;
+            font-size: 18px;
+            border: 1px solid #555;
+            border-radius: 8px;
+            background: #222;
+            color: white;
+        }
+
+        #config-panel input[type="file"] {
+            margin-top: 10px;
+        }
+
+        .btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 14px 28px;
+            font-size: 18px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        .btn-primary {
+            background: #007AFF;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #FF3B30;
+            color: white;
+        }
+
+        .btn-success {
+            background: #34C759;
+            color: white;
+        }
+
+        #photo-count {
+            margin-top: 10px;
+            color: #aaa;
+            font-size: 14px;
+        }
+
+        #schedule-status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 14px;
+            background: #1a1a2e;
+            color: #aaa;
+        }
+
+        /* Écran de démarrage */
+        #start-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+            color: white;
+        }
+
+        #start-screen h1 {
+            font-size: 28px;
+            margin-bottom: 20px;
+        }
+
+        #start-screen p {
+            color: #888;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Écran de démarrage -->
+    <div id="start-screen">
+        <h1>📷 Cadre Photo</h1>
+        <p>Appuyez sur ⚙️ pour configurer</p>
+    </div>
+
+    <!-- Diaporama -->
+    <div id="slideshow"></div>
+
+    <!-- Bouton config -->
+    <button id="config-toggle" onclick="toggleConfig()">⚙️</button>
+
+    <!-- Panneau config -->
+    <div id="config-panel">
+        <h2>⚙️ Configuration</h2>
+
+        <label>📸 Ajouter des photos :</label>
+        <input type="file" id="photo-input" accept="image/*" multiple>
+        <div id="photo-count">Aucune photo chargée</div>
+
+        <label>⏱️ Durée d'affichage (secondes) :</label>
+        <input type="number" id="duration" value="10" min="1" max="3600">
+
+        <label>🕐 Heure de début :</label>
+        <input type="time" id="time-start" value="07:00">
+
+        <label>🕐 Heure de fin :</label>
+        <input type="time" id="time-end" value="22:00">
+
+        <div id="schedule-status">
+            Le diaporama sera actif entre les heures définies.<br>
+            ⚠️ Note : l'iPad doit rester déverrouillé avec Safari ouvert pour que le diaporama fonctionne.
+        </div>
+
+        <br>
+        <button class="btn btn-success" onclick="startSlideshow()">
