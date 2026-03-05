@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Cadre Photo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #000;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            font-family: -apple-system, Arial, sans-serif;
+        }
+
+        /* ── DIAPORAMA ── */
+        #slideshow {
+            position: fixed;
+            inset: 0;
+        }
+
+        #slideshow img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 1.5s ease;
+        }
+
+        #slideshow img.active { opacity: 1; }
+
+        /* ── ECRAN ACCUEIL ── */
+        #start-screen {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+            color: white;
+        }
+
+        #start-screen.hidden { display: none; }
+
+        #start-screen h1 { font-size: 28px; margin-bottom: 10px; }
+        #start-screen p { color: #888; font-size: 16px; }
+
+        /* ── BOUTON CONFIG ── */
+        #config-btn {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            z-index: 1000;
+            background: rgba(255,255,255,0.25);
+            border: none;
+            color: white;
+            font-size: 26px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* ── PANNEAU CONFIG ── */
+        #config-panel {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.96);
+            z-index: 2000;
+            padding: 30px 20px;
+            overflow-y: auto;
+            color: white;
+        }
+
+        #config-panel.open { display: block; }
+
+        .panel-inner {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .panel-inner h2 {
+            font-size: 24px;
+            margin-bottom: 25px;
+        }
+
+        .panel-inner label {
+            display: block;
+            margin-top: 18px;
+            margin-bottom: 6px;
+            font-size: 15px;
+            color: #ccc;
+        }
+
+        .panel-inner input[type="number"],
+        .panel-inner input[type="time"] {
+            width: 100%;
+            padding: 12px;
+            font-size: 18px;
+            border: 1px solid #555;
+            border-radius: 10px;
+            background: #1c1c1e;
+            color: white;
+        }
+
+        .panel-inner input[type="file"] {
+            margin-top: 8px;
+            font-size: 16px;
+        }
+
+        .btn {
+            display: inline-block;
+            margin-top: 15px;
+            margin-right: 10px;
+            padding: 14px 24px;
+            font-size: 17px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+
+        .btn-go { background: #34C759; color: white; }
+        .btn-close { background: #007AFF; color: white; }
+        .btn-danger { background: #FF3B30; color: white; }
+
+        #photo-count {
+            margin-top: 10px;
+            color: #888;
+            font-size: 14px;
+        }
+
+        .info-box {
+            margin-top: 20px;
+            padding: 12px;
+            background: #1c1c1e;
+            border-radius: 10px;
+            color: #999;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        /* ── HORLOGE ── */
+        #clock-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+            color: white;
+            font-size: 42px;
+            font-weight: 200;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+        }
+
+        #clock-date {
+            font-size: 16px;
+            opacity: 0.7;
+        }
+
+        /* ── PAUSE ── */
+        #pause-msg {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 400;
+            color: #555;
+            font-size: 20px;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #pause-msg.visible {
+            display: flex;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Écran accueil -->
+<div id="start-screen">
+    <h1>🖼️ Cadre Photo</h1>
+    <p>Appuyez sur ⚙️ pour ajouter des photos</p>
+</div>
+
+<!-- Diaporama -->
+<div id="slideshow"></div>
+
+<!-- Horloge -->
+<div id="clock-bar">
+    <div id="clock-time">00:00</div>
+    <div id="clock-date"></div>
+</div>
+
+<!-- Pause horaire -->
+<div id="pause-msg">
+    <div style="font-size:50px;margin-bottom:15px;">🌙</div>
+    <div>Diaporama en pause</div>
+</div>
+
+<!-- Bouton config -->
+<button id="config-btn">⚙️</button>
+
+<!-- Panneau config -->
+<div id="config-panel">
+    <div class="panel-inner">
+        <h2>⚙️ Paramètres</h2>
+
+        <label>📸 Ajouter des photos :</label>
+        <input type="file" id="photo-input" accept="image/*" multiple>
+        <div id="photo-count">Aucune photo</div>
+
+        <label>⏱️ Durée par photo (secondes) :</label>
+        <input type="number" id="duration" value="10" min="2" max="3600">
+
+        <label>🕐 Heure de début :</label>
+        <input type="time" id="time-start" value="07:00">
+
+        <label>🕐 Heure de fin :</label>
+        <input type="time" id="time-end" value="22:00">
+
+        <div class="info-box">
+            💡 Le diaporama tourne automatiquement entre les heures choisies.<br>
+            ⚠️ Gardez Safari ouvert et l'iPad branché pour un fonctionnement continu.<br>
+            📌 Astuce : dans Safari → Partager → "Sur l'écran d'accueil" pour en faire une app.
+        </div>
+
+        <br>
+        <button class="btn btn-go" id="btn-start">▶️ Lancer</button>
+        <button class="btn btn-close" id="btn-close">✓ Fermer</button>
+        <button class="btn btn-danger" id="btn-clear">🗑 Tout effacer</button>
+    </div>
+</div>
+
+<script>
+// ════════════════════════════════════════
+//  VARIABLES
+// ════════════════════════════════════════
+let photos = [];
+let currentIndex = 0;
+let slideshowTimer = null;
+let clockTimer = null;
+let scheduleTimer = null;
+
+// Éléments
+const startScreen = document.getElementById('start-screen');
+const slideshow = document.getElementById('slideshow');
+const configPanel = document.getElementById('config-panel');
+const configBtn = document.getElementById('config-btn');
+const photoInput = document.getElementById('photo-input');
+const photoCount = document.getElementById('photo-count');
+const durationInput = document.getElementById('duration');
+const timeStartInput = document.getElementById('time-start');
+const timeEndInput = document.getElementById('time-end');
+const clockTime = document.getElementById('clock-time');
+const clockDate = document.getElementById('clock-date');
+const pauseMsg = document.getElementById('pause-msg');
+const btnStart = document.getElementById('btn-start');
+const btnClose = document.getElementById('btn-close');
+const btnClear = document.getElementById('btn-clear');
+
+// ════════════════════════════════════════
+//  EVENTS
+// ════════════════════════════════════════
+configBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    configPanel.classList.add('open');
+    stopSlideshow();
+});
+
+btnClose.addEventListener('click', function(e) {
+    e.preventDefault();
+    configPanel.classList.remove('open');
+    if (photos.length > 0) {
+        launchSlideshow();
+    }
+});
+
+btnStart.addEventListener('click', function(e) {
+    e.preventDefault();
+    configPanel.classList.remove('open');
+    if (photos.length > 0) {
+        launchSlideshow();
+    }
+});
+
+btnClear.addEventListener('click', function(e) {
+    e.preventDefault();
+    photos = [];
+    slideshow.innerHTML = '';
+    currentIndex = 0;
+    stopSlideshow();
+    startScreen.classList.remove('hidden');
+    pauseMsg.classList.remove('visible');
+    updatePhotoCount();
+});
+
+photoInput.addEventListener('change', function(e) {
+    const files = e.target.files;
+    if (!files.length) return;
+
+    for (let i = 0; i < files.length; i++) {
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            photos.push(ev.target.result);
+            updatePhotoCount();
+        };
+        reader.readAsDataURL(files[i]);
+    }
+});
+
+// ════════════════════════════════════════
+//  FONCTIONS
+// ════════════════════════════════════════
+function updatePhotoCount() {
+    photoCount.textContent = photos.length + ' photo' + (photos.length > 1 ? 's' : '') + ' chargée' + (photos.length > 1 ? 's' : '');
+}
+
+function launchSlideshow() {
+    if (photos.length === 0) return;
+
+    startScreen.classList.add('hidden');
+
+    // Créer les images
+    slideshow.innerHTML = '';
+    photos.forEach(function(src, i) {
+        const img = document.createElement('img');
+        img.src = src;
+        if (i === 0) img.classList.add('active');
+        slideshow.appendChild(img);
+    });
+
+    currentIndex = 0;
+    startSlideshowTimer();
+    startScheduleCheck();
+}
+
+function startSlideshowTimer() {
+    stopSlideshow();
+    if (photos.length <= 1) return;
+
+    const duration = parseInt(durationInput.value) || 10;
+    slideshowTimer = setInterval(function() {
+        const imgs = slideshow.querySelectorAll('img');
+        if (imgs.length === 0) return;
+
+        imgs[currentIndex].classList.remove('active');
+        currentIndex = (currentIndex + 1) % imgs.length;
+        imgs[currentIndex].classList.add('active');
+    }, duration * 1000);
+}
+
+function stopSlideshow() {
+    if (slideshowTimer) {
+        clearInterval(slideshowTimer);
+        slideshowTimer = null;
+    }
+}
+
+function isInSchedule() {
+    const now = new Date();
+    const h = now.getHours();
+    const m = now.getMinutes();
+    const current = h * 60 + m;
+
+    const startParts = timeStartInput.value.split(':');
+    const endParts = timeEndInput.value.split(':');
+    const start = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
+    const end = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
+
+    if (start <= end) {
+        return current >= start && current < end;
+    } else {
+        return current >= start || current < end;
+    }
+}
+
+function startScheduleCheck() {
+    if (scheduleTimer) clearInterval(scheduleTimer);
+
+    function check() {
+        if (photos.length === 0) return;
+
+        if (isInSchedule()) {
+            pauseMsg.classList.remove('visible');
+            if (!slideshowTimer) startSlideshowTimer();
+        } else {
+            pauseMsg.classList.add('visible');
+            stopSlideshow();
+        }
+    }
+
+    check();
+    scheduleTimer = setInterval(check, 30000);
+}
+
+// ════════════════════════════════════════
+//  HORLOGE
+// ════════════════════════════════════════
+function updateClock() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    clockTime.textContent = h + ':' + m;
+
+    const jours = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+    const mois = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+    clockDate.textContent = jours[now.getDay()] + ' ' + now.getDate() + ' ' + mois[now.getMonth()];
+}
+
+updateClock();
+clockTimer = setInterval(updateClock, 10000);
+
+</script>
+</body>
+</html>
