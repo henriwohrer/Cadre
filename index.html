@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="theme-color" content="#000000">
+    <title>Cadre Photo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #000;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            font-family: -apple-system, Arial, sans-serif;
+        }
+
+        #slideshow {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+        }
+
+        #slideshow img {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 1.5s ease;
+        }
+
+        #slideshow img.active { opacity: 1; }
+
+        #zone-left, #zone-right {
+            position: fixed;
+            top: 0;
+            width: 50%;
+            height: 100%;
+            z-index: 100;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #zone-left { left: 0; }
+        #zone-right { right: 0; }
+
+        #start-screen {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+            color: white;
+        }
+
+        #start-screen.hidden { display: none; }
+        #start-screen h1 { font-size: 28px; margin-bottom: 10px; }
+        #start-screen p { color: #888; font-size: 16px; margin-bottom: 30px; }
+
+        .btn {
+            background: #fff;
+            color: #000;
+            border: none;
+            padding: 16px 40px;
+            font-size: 18px;
+            border-radius: 12px;
+            cursor: pointer;
+            margin: 8px;
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: #fff;
+            border: 2px solid #444;
+            padding: 14px 36px;
+            font-size: 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            margin: 8px;
+        }
+
+        #config-btn {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            z-index: 1000;
+            background: rgba(255,255,255,0.25);
+            border: none;
+            color: white;
+            font-size: 26px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: none;
+        }
+
+        #config-panel {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.92);
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        #config-panel.visible { display: flex; }
+
+        #config-panel label {
+            display: block;
+            margin: 12px 0 4px;
+            font-size: 15px;
+            color: #aaa;
+        }
+
+        #config-panel input[type="number"],
+        #config-panel input[type="time"] {
+            background: #222;
+            border: 1px solid #555;
+            color: white;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 16px;
+            width: 200px;
+            text-align: center;
+        }
+
+        #config-panel h2 { margin-bottom: 20px; }
+
+        #photo-count {
+            color: #888;
+            font-size: 14px;
+            margin: 10px 0 20px;
+        }
+
+        #pause-msg {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 400;
+            color: #333;
+            font-size: 22px;
+        }
+
+        #pause-msg.visible { display: flex; }
+    </style>
+</head>
+<body>
+
+<div id="start-screen">
+    <h1>🖼️ Cadre Photo</h1>
+    <p id="start-subtitle">Ajoutez des photos pour commencer</p>
+    <button class="btn" id="start-add-btn">📷 Ajouter des photos</button>
+    <button class="btn" id="start-play-btn" style="display:none;">▶️ Lancer le diaporama</button>
+    <button class="btn-outline" id="start-settings-btn" style="display:none;">⚙️ Réglages</button>
+</div>
+
+<div id="slideshow"></div>
+<div id="zone-left"></div>
+<div id="zone-right"></div>
+
+<button id="config-btn">⚙️</button>
+
+<div id="config-panel">
+    <h2>⚙️ Réglages</h2>
+
+    <label>Durée par photo (secondes)</label>
+    <input type="number" id="duration" value="10" min="1" max="300">
+
+    <label>Durée du fondu (secondes)</label>
+    <input type="number" id="fade" value="1.5" min="0" max="10" step="0.1">
+
+    <label>Affichage de</label>
+    <input type="time" id="time-start" value="07:00">
+
+    <label>Affichage jusqu'à</label>
+    <input type="time" id="time-end" value="23:00">
+
+    <p id="photo-count">0 photo(s)</p>
+
+    <button class="btn" id="add-photos-btn">📷 Ajouter des photos</button>
+    <button class="btn-outline" id="clear-photos-btn">🗑️ Supprimer toutes les photos</button>
+    <br>
+    <button class="btn" id="close-config-btn">✅ Fermer</button>
+</div>
+
+<div id="pause-msg">⏸️ En pause (hors plage horaire)</div>
+
+<input type="file" id="file-input" accept="image/*" multiple style="display:none;">
+
+<script>
+    // ══════════════════════════════════
+    //  ÉLÉMENTS
+    // ══════════════════════════════════
+    var startScreen = document.getElementById('start-screen');
+    var startSubtitle = document.getElementById('start-subtitle');
+    var startAddBtn = document.getElementById('start-add-btn');
+    var startPlayBtn = document.getElementById('start-play-btn');
+    var startSettingsBtn = document.getElementById('start-settings-btn');
+    var slideshow = document.getElementById('slideshow');
+    var zoneLeft = document.getElementById('zone-left');
+    var zoneRight = document.getElementById('zone-right');
+    var configBtn = document.getElementById('config-btn');
+    var configPanel = document.getElementById('config-panel');
+    var durationInput = document.getElementById('duration');
+    var fadeInput = document.getElementById('fade');
+    var timeStartInput = document.getElementById('time-start');
+    var timeEndInput = document.getElementById('time-end');
+    var photoCount = document.getElementById('photo-count');
+    var addPhotosBtn = document.getElementById('add-photos-btn');
+    var clearPhotosBtn = document.getElementById('clear-photos-btn');
+    var closeConfigBtn = document.getElementById('close-config-btn');
+    var pauseMsg = document.getElementById('pause-msg');
+    var fileInput = document.getElementById('file-input');
+
+    var photos = [];
+    var shuffled = [];
+    var currentIndex = 0;
+    var slideshowTimer = null;
+    var scheduleTimer = null;
+    var db = null;
+
+    var DB_NAME = 'CadrePhotoDB';
+    var DB_VERSION = 1;
+    var STORE_NAME = 'photos';
+
+    // ══════════════════════════════════
+    //  INDEXEDDB
+    // ══════════════════════════════════
+    function openDB(callback) {
+        var request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onupgradeneeded = function(e) {
+            var d = e.target.result;
+            if (!d.objectStoreNames.contains(STORE_NAME)) {
+                d.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+            }
+        };
+        request.onsuccess = function(e) {
+            db = e.target.result;
+            callback();
+        };
+        request.onerror = function() {
+            console.error('Erreur IndexedDB');
+            callback();
+        };
+    }
+
+    function loadPhotosFromDB(callback) {
+        if (!db) { callback([]); return; }
+        var tx = db.transaction(STORE_NAME, 'readonly');
+        var store = tx.objectStore(STORE_NAME);
+        var request = store.getAll();
+        request.onsuccess = function() {
+            var results = request.result || [];
+            var arr = [];
+            for (var i = 0; i < results.length; i++) {
+                arr.push(results[i].data);
+            }
+            callback(arr);
+        };
+        request.onerror = function() { callback([]); };
+    }
+
+    function savePhotosToDB(newPhotos, callback) {
+        if (!db) { callback(); return; }
+        var tx = db.transaction(STORE_NAME, 'readwrite');
+        var store = tx.objectStore(STORE_NAME);
+        for (var i = 0; i < newPhotos.length; i++) {
+            store.add({ data: newPhotos[i] });
+        }
+        tx.oncomplete = function() { callback(); };
+        tx.onerror = function() { callback(); };
+    }
+
+    function clearPhotosDB(callback) {
+        if (!db) { callback(); return; }
+        var tx = db.transaction(STORE_NAME, 'readwrite');
+        var store = tx.objectStore(STORE_NAME);
+        store.clear();
+        tx.oncomplete = function() { callback(); };
+        tx.onerror = function() { callback(); };
+    }
+
+    // ══════════════════════════════════
+    //  RÉGLAGES (localStorage)
+    // ══════════════════════════════════
+    function loadSettings() {
+        try {
+            var s = localStorage.getItem('cadre_settings');
+            if (s) {
+                var o = JSON.parse(s);
+                if (o.duration) durationInput.value = o.duration;
+                if (o.fade) fadeInput.value = o.fade;
+                if (o.timeStart) timeStartInput.value = o.timeStart;
+                if (o.timeEnd) timeEndInput.value = o.timeEnd;
+            }
+        } catch(e) {}
+    }
+
+    function saveSettings() {
+        try {
+            localStorage.setItem('cadre_settings', JSON.stringify({
+                duration: durationInput.value,
+                fade: fadeInput.value,
+                timeStart: timeStartInput.value,
+                timeEnd: timeEndInput.value
+            }));
+        } catch(e) {}
+    }
+
+    // ══════════════════════════════════
+    //  INITIALISATION
+    // ══════════════════════════════════
+    loadSettings();
+
+    openDB(function() {
+        loadPhotosFromDB(function(saved) {
+            if (saved.length > 0) {
+                photos = saved;
+                updateStartScreen();
+            }
+        });
+    });
+
+    function updatePhotoCount() {
+        photoCount.textContent = photos.length + ' photo(s)';
+        updateStartScreen();
+    }
+
+    function updateStartScreen() {
+        if (photos.length > 0) {
+            startSubtitle.textContent = photos.length + ' photo(s) enregistrée(s)';
+            startPlayBtn.style.display = 'inline-block';
+            startSettingsBtn.style.display = 'inline-block';
+        } else {
+            startSubtitle.textContent = 'Ajoutez des photos pour commencer';
+            startPlayBtn.style.display = 'none';
+            startSettingsBtn.style.display = 'none';
+        }
+    }
+
+    // ══════════════════════════════════
+    //  CHARGEMENT DES PHOTOS
+    // ══════════════════════════════════
+    var MAX_SIZE = 1920;
+
+    fileInput.addEventListener('change', function(e) {
+        var files = e.target.files;
+        if (!files.length) return;
+
+        var newPhotos = [];
+        var loaded = 0;
+        var total = files.length;
+        photoCount.textContent = 'Chargement... 0/' + total;
+
+        for (var i = 0; i < files.length; i++) {
+            (function(file) {
+                var img = new Image();
+                img.onload = function() {
+                    var canvas = document.createElement('canvas');
+                    var w = img.width;
+                    var h = img.height;
+
+                    if (w > MAX_SIZE || h > MAX_SIZE) {
+                        if (w > h) {
+                            h = Math.round(h * MAX_SIZE / w);
+                            w = MAX_SIZE;
+                        } else {
+                            w = Math.round(w * MAX_SIZE / h);
+                            h = MAX_SIZE;
+                        }
+                    }
+
+                    canvas.width = w;
+                    canvas.height = h;
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+
+                    var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                    newPhotos.push(dataUrl);
+                    loaded++;
+                    photoCount.textContent = 'Chargement... ' + loaded + '/' + total;
+
+                    URL.revokeObjectURL(img.src);
+
+                    if (loaded === total) {
+                        savePhotosToDB(newPhotos, function() {
+                            photos = photos.concat(newPhotos);
+                            updatePhotoCount();
+                        });
+                    }
+                };
+                img.src = URL.createObjectURL(file);
+            })(files[i]);
+        }
+
+        fileInput.value = '';
+    });
+
+    // ══════════════════════════════════
+    //  BOUTONS
+    // ══════════════════════════════════
+    startAddBtn.addEventListener('click', function() {
+        fileInput.click();
+    });
+
+    addPhotosBtn.addEventListener('click', function() {
+        fileInput.click();
+    });
+
+    clearPhotosBtn.addEventListener('click', function() {
+        if (confirm('Supprimer toutes les photos ?')) {
+            clearPhotosDB(function() {
+                photos = [];
+                shuffled = [];
+                slideshow.innerHTML = '';
+                stopSlideshow();
+                updatePhotoCount();
+            });
+        }
+    });
+
+    startPlayBtn.addEventListener('click', function() {
+        if (photos.length === 0) return;
+        startScreen.classList.add('hidden');
+        configBtn.style.display = 'block';
+        launchSlideshow();
+    });
+
+    startSettingsBtn.addEventListener('click', function() {
+        configPanel.classList.add('visible');
+        updatePhotoCount();
+    });
+
+    configBtn.addEventListener('click', function() {
+        configPanel.classList.add('visible');
+        updatePhotoCount();
+    });
+
+    closeConfigBtn.addEventListener('click', function() {
+        configPanel.classList.remove('visible');
+        saveSettings();
+        if (photos.length > 0 && startScreen.classList.contains('hidden')) {
+            launchSlideshow();
+        }
+    });
+
+    // ══════════════════════════════════
+    //  NAVIGATION
+    // ══════════════════════════════════
+    function goTo(direction) {
+        var imgs = slideshow.querySelectorAll('img');
+        if (imgs.length <= 1) return;
+        imgs[currentIndex].classList.remove('active');
+        currentIndex = (currentIndex + direction + imgs.length) % imgs.length;
+        imgs[currentIndex].classList.add('active');
+        startSlideshowTimer();
+    }
+
+    zoneLeft.addEventListener('click', function() { goTo(-1); });
+    zoneRight.addEventListener('click', function() { goTo(1); });
+
+    // ══════════════════════════════════
+    //  DIAPORAMA
+    // ══════════════════════════════════
+    function launchSlideshow() {
+        slideshow.innerHTML = '';
+        stopSlideshow();
+
+        var fadeVal = parseFloat(fadeInput.value) || 1.5;
+
+        shuffled = photos.slice();
+        for (var i = shuffled.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var tmp = shuffled[i];
+            shuffled[i] = shuffled[j];
+            shuffled[j] = tmp;
+        }
+
+        shuffled.forEach(function(src, i) {
+            var img = document.createElement('img');
+            img.src = src;
+            img.style.transition = 'opacity ' + fadeVal + 's ease';
+            if (i === 0) img.classList.add('active');
+            slideshow.appendChild(img);
+        });
+
+        currentIndex = 0;
+        startSlideshowTimer();
+        startScheduleCheck();
+    }
+
+    function startSlideshowTimer() {
+        stopSlideshow();
+        if (shuffled.length <= 1) return;
+        var duration = parseInt(durationInput.value) || 10;
+        slideshowTimer = setInterval(function() {
+            goTo(1);
+        }, duration * 1000);
+    }
+
+    function stopSlideshow() {
+        if (slideshowTimer) {
+            clearInterval(slideshowTimer);
+            slideshowTimer = null;
+        }
+    }
+
+    // ══════════════════════════════════
+    //  PLAGE HORAIRE
+    // ══════════════════════════════════
+    function isInSchedule() {
+        var now = new Date();
+        var current = now.getHours() * 60 + now.getMinutes();
+        var sp = timeStartInput.value.split(':');
+        var ep = timeEndInput.value.split(':');
+        var start = parseInt(sp[0]) * 60 + parseInt(sp[1]);
+        var end = parseInt(ep[0]) * 60 + parseInt(ep[1]);
+        if (start <= end) return current >= start && current < end;
+        return current >= start || current < end;
+    }
+
+    function startScheduleCheck() {
+        if (scheduleTimer) clearInterval(scheduleTimer);
+        function check() {
+            if (photos.length === 0) return;
+            if (isInSchedule()) {
+                pauseMsg.classList.remove('visible');
+                if (!slideshowTimer) startSlideshowTimer();
+            } else {
+                pauseMsg.classList.add('visible');
+                stopSlideshow();
+            }
+        }
+        check();
+        scheduleTimer = setInterval(check, 30000);
+    }
+</script>
+</body>
+</html>
